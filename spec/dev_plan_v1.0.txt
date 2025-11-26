@@ -1,0 +1,274 @@
+# dev_plan_v1.0.txt
+
+This file is a simple roadmap for turning the specs into a real app.
+
+It assumes:
+- Engine spec: model_core_spec_v5.4
+- Runtime: runtime_modes_v6.7
+- Diagnostics: diagnostics_spec_film_room_v1.0
+- Risk: risk_and_limits_v1.0
+- API: api_schema_v1.0
+- Data mapping: data_mapping_v1.0
+
+---
+
+# 1. Overall Goal
+
+Build a small system that can:
+
+1. Take in matchup + prop data.
+2. Run the model rules.
+3. Return structured plays (LOCK/HIGH).
+4. Log bets and outcomes.
+5. Run Film Room diagnostics.
+6. Respect risk and limits.
+
+You don’t have to build everything at once. Do it in phases.
+
+---
+
+# 2. Phase 1 — Local Prototype (No Frontend Yet)
+
+**Goal:** A simple script that reads a JSON file and prints model-style output.
+
+Steps:
+
+1. Create a new project folder, for example:
+   - `/props-model-app`
+
+2. Inside, make:
+   - `/spec` (drop all current .txt spec files here)
+   - `/examples` (use your existing examples)
+   - `/src` (for code)
+
+3. Pick a language for the first prototype:
+   - Python or TypeScript are easiest for this kind of thing.
+
+4. Start with a single script:
+   - `src/run_matchup_example.ts` or `run_matchup_example.py`
+
+5. Hardcode:
+   - Load `matchup_example_01.txt` JSON payload (copy just the JSON into a `.json` file to test).
+   - Simulate model output:
+     - You don’t need to fully implement P0–12 yet.
+     - Just shape the output JSON to match `model_core_spec_v5.4` and `api_schema_v1.0`.
+
+6. Once that works:
+   - You have a “dummy engine” that proves:
+     - Input and output formats are clear.
+     - The structure is realistic.
+
+This phase is about wiring and structure, not accuracy.
+
+---
+
+# 3. Phase 2 — Real Model Logic (Still Local)
+
+**Goal:** Start implementing actual model logic (P0 and a few modules).
+
+Suggested order:
+
+1. Implement **P0 Projection Engine**:
+   - Read stats from a local JSON file following `data_mapping_v1.0`.
+   - Calculate projected minutes, FGA, and a basic points projection.
+
+2. Implement **Module 1 (Pre-Filters)**:
+   - If expected minutes < 24 → PASS.
+   - If blowout risk flagged and role fragile → PASS.
+   - Use simple hard-coded thresholds to start.
+
+3. Implement **Module 2 (Volume Chain)**:
+   - Calculate simple volume tags:
+     - StrongVolume / WeakVolume.
+   - This can be as simple as:
+     - “If FGA per game > threshold → StrongVolume.”
+
+4. Implement **Module 10 (Final Projection Blending)**:
+   - Combine P0 output with basic flags from Modules 1 and 2.
+   - Compare vs line.
+
+5. Implement **Module 11 (Confidence Scoring)**:
+   - LOCK if:
+     - Projection beats line by X points.
+     - No red flags.
+   - HIGH if:
+     - Projection beats line by smaller margin.
+     - Some mild flags.
+
+You don’t need all modules perfect at first.  
+Get a simple end-to-end logic working.
+
+---
+
+# 4. Phase 3 — Minimal API Backend
+
+**Goal:** Wrap your logic in a small API so a frontend can call it.
+
+Steps:
+
+1. Choose a backend framework:
+   - Node + Express / Fastify
+   - or Python FastAPI / Flask
+
+2. Implement endpoints from `api_schema_v1.0`:
+   - `POST /generate-plays`
+     - Accepts JSON.
+     - Passes data into your model logic.
+     - Returns structured JSON output.
+   - `POST /diagnostics`
+     - For now, you can:
+       - Accept completed bets.
+       - Simulate Film Room responses using hard-coded logic, or
+       - Later, actually run module checks based on diagnostics spec.
+   - `GET /weekly-summary`
+     - Use in-memory or simple file logs for now.
+
+3. Add simple logging:
+   - Log each request and response to a file:
+     - `/logs/requests.log`
+     - `/logs/bets.log`
+
+At this point, you technically have a working “engine API.”
+
+---
+
+# 5. Phase 4 — Basic Frontend
+
+**Goal:** A simple web UI that calls your backend.
+
+Since you already use React/Tailwind, you can:
+
+1. Create a new React app:
+   - `/frontend`
+
+2. Core screens:
+
+   - **Matchup Input Screen**
+     - Form to:
+       - Select matchup.
+       - Enter or paste lines for props.
+     - Button: “Generate Plays”
+
+   - **Plays Screen**
+     - Displays model output from `/generate-plays`
+     - Show:
+       - player, market, line, side, confidence
+       - short notes from `module_notes`
+
+   - **Bets Log Screen**
+     - List of bets you actually took (from backend logs).
+     - Let user mark results manually for now.
+
+   - **Weekly Summary Screen**
+     - Calls `/weekly-summary`.
+     - Shows units, hit rate, blocked bets, notes.
+
+3. Keep the UI simple:
+   - No need for perfect design.
+   - Focus on wiring and clarity.
+
+---
+
+# 6. Phase 5 — Film Room Integration
+
+**Goal:** Build a Film Room UI and hook into `/diagnostics`.
+
+Steps:
+
+1. Frontend:
+   - Screen: **Film Room**
+   - Let user:
+     - Select a past bet from a dropdown/list.
+     - Or manually enter:
+       - player, market, line, side, result, context.
+
+2. Backend:
+   - `/diagnostics` uses `diagnostics_spec_film_room_v1.0`.
+   - Returns:
+     - classification (GoodRead / BadRead / Mixed)
+     - modules status
+     - key_factors
+     - suggested_actions
+
+3. UI:
+   - Show this in a clean layout:
+     - “Result: Good Read – Unlucky”
+     - “Modules: P0 Correct, Volume MinorIssue, RoleCompression MajorIssue”
+     - “Key factors: foul trouble, role compression from returning star”
+
+---
+
+# 7. Phase 6 — Risk & Limits Logic
+
+**Goal:** Enforce your risk rules inside the system.
+
+Steps:
+
+1. Add a small “risk engine” on the backend:
+   - Before accepting bets into the log:
+     - Check unit size.
+     - Check daily/weekly caps.
+     - Check emotional flags (user can send a simple form).
+
+2. Integrate with frontend:
+   - Show:
+     - “You’ve hit your 5 straight bets for tonight.”
+     - “Weekly budget reached. No more bets allowed.”
+
+3. Log blocked bets with reasons.
+
+This makes the app feel like a strict coach.
+
+---
+
+# 8. Phase 7 — Data Automation (Optional, Later)
+
+Once the core app works:
+
+1. Replace manual stats input with:
+   - Real NBA stats APIs.
+   - Real sportsbook APIs (if accessible).
+
+2. Map fields using `data_mapping_v1.0`.
+
+3. Add caching:
+   - Don’t fetch the same stats repeatedly for the same slate.
+
+---
+
+# 9. Phase 8 — Refine Model Modules
+
+As you gather Film Room data:
+
+1. Update:
+   - `model_core_spec_vX.X`
+   - `diagnostics_spec_film_room_vX.X`
+   - `risk_and_limits_vX.X`
+
+2. Use:
+   - `CHANGELOG.md` to track what changed and why.
+
+3. Slowly harden rules:
+   - Promote soft candidates to real rules when patterns repeat.
+
+---
+
+# 10. Philosophy Reminder
+
+This whole system is meant to:
+
+- Keep you structured.
+- Keep rules explicit.
+- Avoid “gut drift.”
+- Keep betting a controlled hobby.
+
+When in doubt:
+- Update the specs first.
+- Then update the code.
+
+Specs are the truth.  
+Code is the implementation.
+
+---
+
+# END

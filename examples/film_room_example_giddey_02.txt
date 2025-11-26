@@ -1,0 +1,51 @@
+# film_room_example_giddey_02.md
+
+## Bet Details
+- **Player:** Josh Giddey  
+- **Market:** Rebounds  
+- **Line:** 8.5  
+- **Side:** Over  
+- **Final Result:** 7  
+
+## Game Stat Line
+- Minutes: 35  
+- Rebounds: 7 (0 OREB, 7 DREB)  
+- FG: 6/12  
+- 3PT: 4/10  
+- FT: 5/6  
+- Points: 21  
+- Assists: 6  
+- Turnovers: 5  
+- Fouls: 3  
+- Plus/Minus: -13  
+
+## Model Rebuild (Pre-Game)
+- Expected minutes: 32–36  
+- Volume: Strong defensive rebounder  
+- Matchup: Neutral-to-Positive (opponent poor DREB team)  
+- Archetype: Big guard rebounder  
+- Regression: No red flags  
+- Blowout Risk: Medium  
+- Role: Stable  
+
+## What Actually Happened
+- Minutes aligned with projection  
+- Team rebounding distribution more balanced than usual  
+- Opponent had fewer missed shots than projection (lower rebound pool)  
+- No major foul trouble  
+
+## Classification
+**Mixed Case**  
+Model read was mostly correct, but rebound pool variance limited outcome.
+
+## Module Attribution
+- **P0 Projection:** MinorIssue (slightly overestimated rebound pool)  
+- **Volume Chain:** MinorIssue  
+- **Matchup Engine:** Correct  
+- **Archetype Matrix:** Correct  
+- **Role Compression:** Correct  
+- **Blowout Logic:** Correct  
+
+## Suggested Actions
+- **Soft Candidate:**  
+  - Consider small adjustment for matchups where opponent FG% spikes reduce rebound opportunities.

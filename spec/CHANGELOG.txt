@@ -1,0 +1,9 @@
+# CHANGELOG.md
+
+## 2025-11-26 — Initial Full Spec Release
+- Added model_core_spec_v5.4
+- Added runtime_modes_v6.7
+- Added diagnostics_spec_film_room_v1.0
+- Added risk_and_limits_v1.0
+- Added props_model_README
+- Created example Film Room diagnostic files (trey_example_01, giddey_example_02)

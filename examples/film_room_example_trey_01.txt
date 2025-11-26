@@ -1,0 +1,53 @@
+# film_room_example_trey_01.md
+
+## Bet Details
+- **Player:** Trey (sample name from film room logs)
+- **Market:** Points  
+- **Line:** 24.5  
+- **Side:** Over  
+- **Final Result:** 29  
+
+## Game Stat Line
+- Minutes: 30  
+- FG: 8/14  
+- 3PT: 0/0  
+- FT: 13/16  
+- Points: 29  
+- Rebounds: 1  
+- Assists: 2  
+- Turnovers: 2  
+- Fouls: 2  
+- Plus/Minus: +2  
+
+## Model Rebuild (Pre-Game)
+- Expected minutes: 32–34  
+- Volume: StrongVolume (FGA stable, FT-driven scorer)  
+- Matchup: Advantage (high foul-rate opponent)  
+- Archetype: Driver/FT-heavy  
+- Regression: No red flags  
+- Blowout: Low  
+- Role: Stable
+
+## What Actually Happened
+- Minutes slightly lower but still healthy (30)  
+- FT volume extremely high (16 attempts)  
+- Shot volume in expected range  
+- Efficiency normal  
+- No foul trouble or injury to suppress minutes  
+
+## Classification
+**Good Read — Unlucky/Mixed**  
+Slight minutes dip but volume and efficiency aligned with expectations.
+
+## Module Attribution
+- **P0 Projection:** Correct  
+- **Volume Chain:** Correct  
+- **Matchup Engine:** Correct  
+- **Archetype Matrix:** Correct  
+- **Regression/Heater:** Correct  
+- **Role Compression:** Correct  
+- **Blowout Logic:** Correct  
+
+## Suggested Actions
+- **No Change**  
+This was a clean hit and aligned with model logic.

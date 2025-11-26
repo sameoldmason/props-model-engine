@@ -1,0 +1,234 @@
+# matchup_example_01.txt
+
+This example shows a full end-to-end run for a single matchup using the model specs.
+
+---
+
+## 1. Context
+
+- **Matchup:** Celtics @ Pistons
+- **Slate Date:** 2025-11-26 (example)
+- **Mode:** Matchup Mode (runtime_modes_v6.7)
+- **Engine:** model_core_spec_v5.4
+- **Risk Mode:** risk_and_limits_v1.0 (applied later when betting)
+
+This is a **fake / illustrative** example meant to show structure, not real edges.
+
+---
+
+## 2. Input Snapshot (Human-Readable)
+
+### 2.1 Confirmed Starters (Example)
+
+**Celtics**
+- PG: Jrue Holiday — 34 min projection
+- SG: Derrick White — 34 min
+- SF: Jaylen Brown — 35 min
+- PF: Jayson Tatum — 37 min
+- C: Kristaps Porziņģis — 32 min
+
+**Pistons**
+- PG: Cade Cunningham — 36 min
+- SG: Marcus Sasser — 30 min
+- SF: Ausar Thompson — 30 min
+- PF: Isaiah Stewart — 30 min
+- C: Jalen Duren — 30 min
+
+### 2.2 Key Injury / Rotation Notes
+
+- No major injuries on either side.
+- Celtics expected to run tight 8-man rotation.
+- Pistons give Cade heavy on-ball usage, Duren strong rebound role.
+
+### 2.3 Pace / Environment
+
+- Projected pace: slightly above league average.
+- Foul environment: normal.
+- Blowout risk: medium (Celtics favored by ~9).
+
+### 2.4 Example Prop Lines (Fake)
+
+**Celtics props**
+- Jayson Tatum points: **28.5** (O/U)
+- Jaylen Brown points: **23.5**
+- Kristaps Porziņģis rebounds: **8.5**
+- Jrue Holiday assists: **6.5**
+
+**Pistons props**
+- Cade Cunningham points: **24.5**
+- Jalen Duren rebounds: **10.5**
+
+---
+
+## 3. Input Payload (Example JSON for /generate-plays)
+
+```json
+{
+  "slate_date": "2025-11-26",
+  "matchups": [
+    {
+      "home_team": "Pistons",
+      "away_team": "Celtics",
+      "starters": {
+        "Celtics": [
+          { "player": "Jrue Holiday", "minutes_proj": 34 },
+          { "player": "Derrick White", "minutes_proj": 34 },
+          { "player": "Jaylen Brown", "minutes_proj": 35 },
+          { "player": "Jayson Tatum", "minutes_proj": 37 },
+          { "player": "Kristaps Porzingis", "minutes_proj": 32 }
+        ],
+        "Pistons": [
+          { "player": "Cade Cunningham", "minutes_proj": 36 },
+          { "player": "Marcus Sasser", "minutes_proj": 30 },
+          { "player": "Ausar Thompson", "minutes_proj": 30 },
+          { "player": "Isaiah Stewart", "minutes_proj": 30 },
+          { "player": "Jalen Duren", "minutes_proj": 30 }
+        ]
+      },
+      "pace": {
+        "celtics_pace": 99.5,
+        "pistons_pace": 100.5,
+        "projected_pace": 100.0
+      },
+      "props": [
+        {
+          "player": "Jayson Tatum",
+          "team": "Celtics",
+          "market": "Points",
+          "line": 28.5,
+          "book": "ExampleBook",
+          "odds": -115
+        },
+        {
+          "player": "Jaylen Brown",
+          "team": "Celtics",
+          "market": "Points",
+          "line": 23.5,
+          "book": "ExampleBook",
+          "odds": -110
+        },
+        {
+          "player": "Kristaps Porzingis",
+          "team": "Celtics",
+          "market": "Rebounds",
+          "line": 8.5,
+          "book": "ExampleBook",
+          "odds": -105
+        },
+        {
+          "player": "Cade Cunningham",
+          "team": "Pistons",
+          "market": "Points",
+          "line": 24.5,
+          "book": "ExampleBook",
+          "odds": -110
+        },
+        {
+          "player": "Jalen Duren",
+          "team": "Pistons",
+          "market": "Rebounds",
+          "line": 10.5,
+          "book": "ExampleBook",
+          "odds": -115
+        }
+      ]
+    }
+  ]
+}
+```
+
+This is the kind of payload future backend will send to the “brain.”
+
+---
+
+## 4. Example Model Output (Fake, But Structured)
+
+This output format follows `model_core_spec_v5.4` and `runtime_modes_v6.7`.
+
+```json
+{
+  "plays": [
+    {
+      "player": "Jayson Tatum",
+      "team": "Celtics",
+      "market": "Points",
+      "line": 28.5,
+      "side": "Over",
+      "confidence": "HIGH",
+      "projection": {
+        "low": 27.0,
+        "mid": 30.2,
+        "high": 33.5
+      },
+      "hit_prob": 0.61,
+      "module_notes": {
+        "P0": "Projected 30.2 pts on 20-22 FGA at slightly elevated pace.",
+        "Volume": "StrongVolume (stable usage, 36-38 minutes).",
+        "Matchup": "Advantage (Pistons weak at containing wings, limited rim deterrence).",
+        "Regression": "No heater red flags; efficiency in normal band.",
+        "Role": "Stable star usage; no key teammates returning.",
+        "Blowout": "Medium risk but Tatum likely plays into late 3rd/early 4th.",
+        "HomeRoad": "No major split impact."
+      }
+    },
+    {
+      "player": "Jaylen Brown",
+      "team": "Celtics",
+      "market": "Points",
+      "line": 23.5,
+      "side": "Over",
+      "confidence": "HIGH",
+      "projection": {
+        "low": 22.0,
+        "mid": 25.1,
+        "high": 28.0
+      },
+      "hit_prob": 0.59,
+      "module_notes": {
+        "P0": "Projected 25.1 pts on 18-20 FGA.",
+        "Volume": "StrongVolume; minutes in low-mid 30s.",
+        "Matchup": "Advantage versus weaker wing defenders.",
+        "Regression": "Slight FG% regression down from short-term heater baked in.",
+        "Role": "Stable secondary scorer.",
+        "Blowout": "Medium risk; still safe for full run in competitive scripts."
+      }
+    },
+    {
+      "player": "Jalen Duren",
+      "team": "Pistons",
+      "market": "Rebounds",
+      "line": 10.5,
+      "side": "Over",
+      "confidence": "LOCK",
+      "projection": {
+        "low": 10.2,
+        "mid": 12.3,
+        "high": 14.0
+      },
+      "hit_prob": 0.67,
+      "module_notes": {
+        "P0": "Projected 12.3 rebounds in ~30 minutes.",
+        "Volume": "Strong defensive rebound volume vs high 3PA and rim attempts.",
+        "Matchup": "Advantage on glass; Celtics stretch bigs pull out but allow putbacks.",
+        "Regression": "No heater; recent 14-15 rebound games partially matchup-driven.",
+        "Role": "Stable starting center; closing minutes in most scripts.",
+        "Blowout": "Medium; even in loss, expects enough run for 11+ rebounds."
+      }
+    }
+  ],
+  "notes": "Other props either lacked a clear projection edge or had volatility/role concerns that failed pre-filters."
+}
+```
+
+---
+
+## 5. How Future-You Uses This File
+
+- As a template for **backend integration tests**.
+- As a reference when:
+  - building `/generate-plays` endpoint,
+  - wiring data sources,
+  - checking that the model’s JSON response matches the expected shape.
+
+To add this to your repo:
+- Drop this file into `/examples` as `matchup_example_01.txt` or rename to `.md` if you prefer Markdown.
