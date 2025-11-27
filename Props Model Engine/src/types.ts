@@ -45,6 +45,7 @@ export interface Projection {
 }
 
 export interface ModuleNotes {
+  PreFilters: string;
   P0: string;
   Volume: string;
   Matchup: string;
