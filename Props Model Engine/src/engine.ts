@@ -5,138 +5,69 @@ import {
   GeneratePlaysResponse,
   Matchup,
   Play,
-  Market
+  PlayerUsageProfile,
+  OpponentEfficiency
 } from "./types";
 import { runPreFilters } from "./modules/preFilters";
 import { runVolumeChain } from "./modules/volumeChain";
-
-// ---- P0-Lite Helpers (Structured but Simple) ---- //
-
-function minutesFactor(minutes: number | null): number {
-  if (minutes === null) return 0.5;
-
-  if (minutes >= 36) return 2.0;
-  if (minutes >= 32) return 1.5;
-  if (minutes >= 28) return 1.0;
-  if (minutes >= 24) return 0.7;
-  return 0.4;
-}
-
-function paceFactor(projectedPace: number): number {
-  if (projectedPace >= 102) return 0.8;
-  if (projectedPace >= 100) return 0.5;
-  if (projectedPace <= 96) return -0.5;
-  if (projectedPace <= 98) return -0.2;
-  return 0.0;
-}
-
-function roleFactor(minutes: number | null): number {
-  if (minutes === null) return 0.0;
-  if (minutes >= 34) return 0.8;
-  if (minutes >= 30) return 0.5;
-  return 0.2;
-}
-
-function regressionFactor(): number {
-  return 0.0; // placeholder
-}
-
-// ---- Market-specific mid projections ---- //
-
-function projectPointsMid(
-  line: number,
-  minutes: number | null,
-  projectedPace: number
-): number {
-  const mFactor = minutesFactor(minutes); // high impact
-  const pFactor = paceFactor(projectedPace); // medium impact
-  const rlFactor = roleFactor(minutes);
-  const rFactor = regressionFactor();
-  const marketBias = 0.4; // small global bias for points edges
-
-  const totalBump = mFactor + pFactor + rlFactor + rFactor + marketBias;
-  return line + totalBump;
-}
-
-function projectReboundsMid(
-  line: number,
-  minutes: number | null,
-  projectedPace: number
-): number {
-  const mFactor = minutesFactor(minutes); // big for rebounding
-  const rlFactor = roleFactor(minutes);
-  const rFactor = regressionFactor();
-
-  // pace matters, but a bit less than for points
-  const pFactor = paceFactor(projectedPace) * 0.5;
-  const marketBias = 0.2;
-
-  const totalBump = mFactor + rlFactor + rFactor + pFactor + marketBias;
-  return line + totalBump;
-}
-
-function projectAssistsMid(
-  line: number,
-  minutes: number | null,
-  projectedPace: number
-): number {
-  const mFactor = minutesFactor(minutes);
-  const pFactor = paceFactor(projectedPace); // good for assist opps
-  const rlFactor = roleFactor(minutes);
-  const rFactor = regressionFactor();
-  const marketBias = 0.3;
-
-  const totalBump = mFactor + pFactor + rlFactor + rFactor + marketBias;
-  return line + totalBump;
-}
-
-function projectGenericMid(
-  line: number,
-  minutes: number | null,
-  projectedPace: number
-): number {
-  const mFactor = minutesFactor(minutes);
-  const pFactor = paceFactor(projectedPace) * 0.5;
-  const rlFactor = roleFactor(minutes);
-  const rFactor = regressionFactor();
-  const marketBias = 0.1;
-
-  const totalBump = mFactor + pFactor + rlFactor + rFactor + marketBias;
-  return line + totalBump;
-}
-
-// router: decide which market projection to use
-function projectMidpointByMarket(
-  market: Market,
-  line: number,
-  minutes: number | null,
-  projectedPace: number
-): number {
-  switch (market) {
-    case "Points":
-      return projectPointsMid(line, minutes, projectedPace);
-    case "Rebounds":
-      return projectReboundsMid(line, minutes, projectedPace);
-    case "Assists":
-      return projectAssistsMid(line, minutes, projectedPace);
-    // PRA / PR / PA / AR can later be their own logic
-    default:
-      return projectGenericMid(line, minutes, projectedPace);
-  }
-}
+import { assessBlowoutRisk } from "./modules/blowout";
+import { detectRegression } from "./modules/regression";
+import { projectPointsP0 } from "./model/p0";
 
 // ---- Lookup Helpers ---- //
+
+function findPlayerStats(matchup: Matchup, player: string): PlayerUsageProfile | null {
+  const stats = matchup.player_stats[player];
+  return stats ?? null;
+}
 
 function findProjectedMinutes(
   matchup: Matchup,
   player: string,
   team: string
 ): number | null {
+  const playerStats = findPlayerStats(matchup, player);
+  if (playerStats?.recent_minutes_avg) {
+    return playerStats.recent_minutes_avg;
+  }
+  if (playerStats?.minutes_avg) {
+    return playerStats.minutes_avg;
+  }
+
   const teamStarters = matchup.starters[team];
   if (!teamStarters) return null;
 
   const found = teamStarters.find((s) => s.player === player);
   return found ? found.minutes_proj : null;
+}
+
+function findUsageRate(matchup: Matchup, player: string): number | null {
+  const stats = findPlayerStats(matchup, player);
+  if (!stats) return null;
+  return stats.recent_usage_rate ?? stats.usage_rate ?? null;
+}
+
+function findShotVolume(matchup: Matchup, player: string): number | null {
+  const stats = findPlayerStats(matchup, player);
+  return stats?.fga ?? null;
+}
+
+function findOpponentEfficiency(matchup: Matchup, team: string): OpponentEfficiency | null {
+  const opponentTeam = team === matchup.home_team ? matchup.away_team : matchup.home_team;
+  return matchup.opponent_efficiency[opponentTeam] ?? null;
+}
+
+function estimateRecentPointsPerPoss(
+  stats: PlayerUsageProfile | null,
+  pace: number
+): number | null {
+  if (!stats?.recent_points_avg || !stats.minutes_avg) return null;
+  const usage = stats.recent_usage_rate ?? stats.usage_rate;
+  if (!usage) return null;
+
+  const possessions = pace * (stats.minutes_avg / 48) * usage;
+  if (possessions <= 0) return null;
+  return stats.recent_points_avg / possessions;
 }
 
 // ---- Main Engine ---- //
@@ -146,16 +77,22 @@ export function generatePlays(req: GeneratePlaysRequest): GeneratePlaysResponse 
 
   for (const matchup of req.matchups) {
     const projectedPace = matchup.pace.projected_pace;
+    const projectedPossessions = matchup.pace.projected_possessions;
 
     for (const prop of matchup.props) {
       const minutes = findProjectedMinutes(matchup, prop.player, prop.team);
+      const usageRate = findUsageRate(matchup, prop.player);
+      const shotVolume = findShotVolume(matchup, prop.player);
+      const playerStats = findPlayerStats(matchup, prop.player);
+      const opponent = findOpponentEfficiency(matchup, prop.team);
 
       // ---- Module 1: Pre-Filters ---- //
       const preFilterResult = runPreFilters({
         market: prop.market,
         line: prop.line,
         minutes,
-        projectedPace
+        projectedPace,
+        usageRate
       });
 
       if (!preFilterResult.pass) {
@@ -166,22 +103,80 @@ export function generatePlays(req: GeneratePlaysRequest): GeneratePlaysResponse 
       const volumeResult = runVolumeChain({
         minutes,
         market: prop.market,
-        line: prop.line
+        line: prop.line,
+        usageRate,
+        shotVolume,
+        recentMinutes: playerStats?.recent_minutes_avg ?? null,
+        emphasize: true
       });
 
-      // ---- P0-lite, Market-aware Projection ---- //
-      const mid = projectMidpointByMarket(
-        prop.market,
-        prop.line,
-        minutes,
-        projectedPace
-      );
-      const edge = mid - prop.line;
+      // ---- P0 Projection ---- //
+      let projectionMid = prop.line;
+      let projectionLow = prop.line;
+      let projectionHigh = prop.line;
+      let edge = 0;
+      let p0Note = "P0 fallback";
 
-      // simple edge filter
+      if (prop.market === "Points") {
+        const p0Result = projectPointsP0({
+          line: prop.line,
+          minutes,
+          usageRate,
+          projectedPace,
+          projectedPossessions,
+          opponent,
+          recentPointsPerPoss: estimateRecentPointsPerPoss(playerStats, projectedPace)
+        });
+        projectionMid = p0Result.projection.mid;
+        projectionLow = p0Result.projection.low;
+        projectionHigh = p0Result.projection.high;
+        edge = p0Result.edge;
+        p0Note = p0Result.notes;
+      } else {
+        const band = Math.max(1, (minutes ?? 28) / 12);
+        projectionMid = prop.line + band;
+        projectionLow = prop.line - band / 2;
+        projectionHigh = prop.line + band * 1.5;
+        edge = projectionMid - prop.line;
+        p0Note = `Heuristic projection (${prop.market}) mid=${projectionMid.toFixed(
+          1
+        )}, minutes input=${minutes ?? "n/a"}`;
+      }
+
       if (edge < 1) continue;
 
-      const confidence: Play["confidence"] = edge >= 3 ? "LOCK" : "HIGH";
+      const confidence: Play["confidence"] = edge >= 4 ? "LOCK" : "HIGH";
+
+      const blowout = assessBlowoutRisk({
+        vegas: matchup.vegas,
+        schedule: matchup.schedule?.[prop.team]
+      });
+      const regression = detectRegression({
+        recentAverage: playerStats?.recent_points_avg,
+        seasonAverage: playerStats?.points_avg
+      });
+
+      const hitProbBase = confidence === "LOCK" ? 0.64 : 0.58;
+      const hit_prob = Math.max(
+        0.5,
+        Math.min(
+          0.72,
+          hitProbBase - (blowout.flagged ? 0.03 : 0) - (regression.flagged ? 0.02 : 0)
+        )
+      );
+
+      const roleNote = `Role: minutes=${minutes ?? "n/a"}, usage=${
+        usageRate ?? "n/a"
+      }, recentMinutes=${playerStats?.recent_minutes_avg ?? "n/a"}, shots=${shotVolume ?? "n/a"}`;
+
+      const matchupNote = `Pace=${projectedPace.toFixed(1)}, possessions=${projectedPossessions.toFixed(
+        1
+      )}, opponentDef=${opponent?.defensive_rating ?? "n/a"}`;
+
+      const preFilterNote =
+        preFilterResult.reasons.length > 0
+          ? preFilterResult.reasons.join(", ")
+          : "Passed all pre-filters.";
 
       const play: Play = {
         player: prop.player,
@@ -191,29 +186,19 @@ export function generatePlays(req: GeneratePlaysRequest): GeneratePlaysResponse 
         side: "Over",
         confidence,
         projection: {
-          low: mid - 2,
-          mid,
-          high: mid + 2
+          low: projectionLow,
+          mid: projectionMid,
+          high: projectionHigh
         },
-        hit_prob: confidence === "LOCK" ? 0.65 : 0.58,
+        hit_prob,
         module_notes: {
-          PreFilters:
-            preFilterResult.reasons.length > 0
-              ? preFilterResult.reasons.join(", ")
-              : "Passed all pre-filters.",
-          P0: `P0-lite(${prop.market}): mid=${mid.toFixed(
-            1
-          )} vs line=${prop.line} (edge=${edge.toFixed(1)})`,
+          PreFilters: preFilterNote,
+          P0: p0Note,
           Volume: volumeResult.notes,
-          Matchup: `Pace=${projectedPace} → paceFactor=${paceFactor(
-            projectedPace
-          ).toFixed(1)}`,
-          Regression:
-            "Regression not wired yet (neutral factor = 0.0 for now).",
-          Role: `RoleFactor=${roleFactor(minutes).toFixed(
-            1
-          )} (starter/stable placeholder).`,
-          Blowout: "Blowout logic not implemented yet (placeholder)."
+          Matchup: matchupNote,
+          Regression: regression.notes,
+          Role: roleNote,
+          Blowout: blowout.notes
         }
       };
 
@@ -224,6 +209,6 @@ export function generatePlays(req: GeneratePlaysRequest): GeneratePlaysResponse 
   return {
     plays,
     notes:
-      "Output generated by P0-lite engine with basic Pre-Filters, Volume Chain, and market-specific projection."
+      "Output generated by upgraded P0 projections, enriched volume/role tags, and new blowout/regression checks."
   };
 }
