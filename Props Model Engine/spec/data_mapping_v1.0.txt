@@ -1,0 +1,225 @@
+# data_mapping_v1.0.txt
+
+This file defines how real-world NBA data maps to model inputs.
+
+---
+
+# 1. Purpose
+
+To run model_core_spec_v5.4 correctly, the backend must convert raw NBA stats → model-ready inputs.
+
+This file defines:
+- each required input,
+- where to fetch it,
+- how to transform it.
+
+---
+
+# 2. Required Model Inputs + Mapping
+
+Below is a complete mapping.
+
+---
+
+## 2.1 Minutes (last 5–10 games)
+
+**Source:**  
+- NBA stats API → player game logs
+
+**Transformation:**  
+- Take last 5–10 games → compute:
+  - mean minutes
+  - weighted average (recent games weighted more)
+- Adjust for:
+  - injuries
+  - role changes
+  - matchup-based rotation tendencies
+
+Used in:
+- P0, Modules 1, 2, 6
+
+---
+
+## 2.2 Usage Rate
+
+**Source:**  
+- NBA advanced stats (USG%)
+
+**Transformation:**  
+- Last 5–10 average
+- Adjust for teammate absence/return
+
+Used in:
+- P0, Volume Chain
+
+---
+
+## 2.3 FGA Volume
+
+**Source:**  
+- Box score logs (FGA per game)
+
+**Transformation:**  
+- Last 5–10 average
+- Split into:
+  - midrange attempts
+  - rim attempts
+  - catch-and-shoot
+  - pull-up attempts  
+  (if advanced API available)
+
+Used in:
+- P0, Volume Chain
+
+---
+
+## 2.4 Efficiency (FG%, TS%)
+
+**Source:**  
+- Box score + advanced stats
+
+**Transformation:**
+- Remove outliers (extreme heaters)
+- Regression tag if above normal band
+
+Used in:
+- P0, Regression
+
+---
+
+## 2.5 Pace
+
+**Source:**  
+- Team pace stats
+
+**Transformation:**  
+- Blend home team pace + away team pace  
+- Take average  
+- Apply matchup correction (fast vs slow teams)
+
+Used in:
+- P0, Matchup Engine, Blowout Logic
+
+---
+
+## 2.6 Defensive Scheme
+
+**Source:**
+- Public scouting reports
+- Defensive matchup stats
+- Opponent tendencies:
+  - switching %
+  - drop coverage frequency
+  - help-side tendencies
+  - rim deterrence metrics
+
+Used in:
+- Matchup Engine
+- Archetype Matrix
+
+---
+
+## 2.7 Rim Protection
+
+**Source:**
+- Opponent rim FG% allowed
+- Opponent blocks
+- Defensive field goal suppression data
+
+Used in:
+- Matchup Engine
+- Hard Rules
+
+---
+
+## 2.8 Foul Environment
+
+**Source:**
+- Opponent fouls per game
+- Opponent foul rate vs drivers
+
+Used in:
+- Volume Chain
+- Blowout Logic
+
+---
+
+## 2.9 Teammate Availability
+
+**Source:**
+- Injury report APIs
+
+**Transformation:**
+- Determine role compression or expansion
+- Apply facilitator tilt or scorer tilt if key teammate returns/leaves
+
+Used in:
+- Volume Chain
+- Role Compression
+
+---
+
+## 2.10 Rotation Patterns
+
+**Source:**
+- Coach rotation tendencies
+- Bench usage
+- Player closing patterns
+
+Used in:
+- Pre-Filters
+- Role Compression
+
+---
+
+## 2.11 Prop Lines
+
+**Source:**
+- Sportsbook API
+
+**Transformation:**
+- Convert to numeric lines
+- Store odds
+- Store market type
+
+Used in:
+- Final Projection
+- Confidence Scoring
+
+---
+
+## 2.12 Role Volatility
+
+**Source:**
+- Internal tagging:
+  - Green (stable)
+  - Yellow (some variance)
+  - Red (high variance)
+
+Used in:
+- Volume Chain
+- Role Compression
+- Confidence Scoring
+
+---
+
+# 3. Summary Table
+
+| Input | Source | Used In |
+|-------|--------|---------|
+| minutes | game logs | P0, 1, 2, 6 |
+| usage | advanced stats | P0, 2 |
+| FGA | box scores | P0, 2 |
+| efficiency | advanced stats | P0, 5 |
+| pace | team stats | P0, 3, 7 |
+| defensive scheme | scouting | 3, 4 |
+| rim protection | advanced defense | 3, 4, 9 |
+| foul environment | team stats | 2, 7 |
+| teammate availability | injury reports | 1, 6 |
+| rotations | coach tendencies | 1, 6 |
+| prop lines | sportsbook API | 10, 11 |
+| role volatility | internal | 2, 6 |
+
+---
+
+# END

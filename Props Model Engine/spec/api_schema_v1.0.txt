@@ -1,0 +1,204 @@
+# api_schema_v1.0.txt
+
+This file defines the API structure for the future props-model backend.
+
+---
+
+# 1. Overview
+
+The API exposes three main endpoints:
+
+1. **POST /generate-plays**  
+   Runs the full model (model_core_spec_v5.4 + runtime_modes_v6.7).
+
+2. **POST /diagnostics**  
+   Runs Film Room diagnostics (diagnostics_spec_film_room_v1.0).
+
+3. **GET /weekly-summary**  
+   Returns risk, logging, and weekly performance details (risk_and_limits_v1.0).
+
+All responses must follow strict JSON structure.
+
+---
+
+# 2. POST /generate-plays
+
+## Description
+Runs the model using provided matchup + slate data.
+
+## Request Body (JSON)
+
+```json
+{
+  "slate_date": "YYYY-MM-DD",
+  "matchups": [
+    {
+      "home_team": "string",
+      "away_team": "string",
+      "starters": {
+        "TeamName": [
+          { "player": "string", "minutes_proj": number },
+          { "player": "string", "minutes_proj": number }
+        ]
+      },
+      "pace": {
+        "team_pace_1": number,
+        "team_pace_2": number,
+        "projected_pace": number
+      },
+      "props": [
+        {
+          "player": "string",
+          "team": "string",
+          "market": "Points | Rebounds | Assists | PRA | PR | PA | AR",
+          "line": number,
+          "book": "string",
+          "odds": number
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Requirements
+- All data **must be timestamped**.
+- Missing data → downgrade or PASS.
+- No invented fields allowed.
+
+---
+
+## Response Format (JSON)
+
+```json
+{
+  "plays": [
+    {
+      "player": "string",
+      "team": "string",
+      "market": "string",
+      "line": number,
+      "side": "Over | Under",
+      "confidence": "LOCK | HIGH",
+      "projection": {
+        "low": number,
+        "mid": number,
+        "high": number
+      },
+      "hit_prob": number,
+      "module_notes": {
+        "P0": "string",
+        "Volume": "string",
+        "Matchup": "string",
+        "Regression": "string",
+        "Role": "string",
+        "Blowout": "string"
+      }
+    }
+  ],
+  "notes": "string"
+}
+```
+
+---
+
+# 3. POST /diagnostics
+
+## Description
+Runs Film Room diagnostics for completed bets.
+
+## Request Body
+
+```json
+{
+  "completed_bets": [
+    {
+      "player": "string",
+      "team": "string",
+      "opponent": "string",
+      "market": "string",
+      "line": number,
+      "side": "Over | Under",
+      "final_result": number,
+      "minutes": number,
+      "context": {
+        "foul_trouble": "yes | no | frame-specific",
+        "injury": "none | description",
+        "blowout": "yes | no",
+        "role_change": "none | description"
+      }
+    }
+  ]
+}
+```
+
+## Response Format
+
+```json
+{
+  "diagnostics": [
+    {
+      "bet": { ... },
+      "classification": "GoodRead | BadRead | MixedCase",
+      "summary": "string",
+      "modules": [
+        { "name": "P0", "status": "Correct | MinorIssue | MajorIssue" }
+      ],
+      "key_factors": ["string", "string"],
+      "suggested_actions": [
+        { "severity": "None | SoftCandidate | StrongCandidate", "description": "string" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+# 4. GET /weekly-summary
+
+## Description
+Returns a summary of all bets placed + risk usage.
+
+## Example Output
+
+```json
+{
+  "week_start": "YYYY-MM-DD",
+  "week_end": "YYYY-MM-DD",
+  "total_units_risked": number,
+  "total_units_won": number,
+  "straight_record": "W-L",
+  "realistic_parlay_record": "W-L",
+  "lotto_parlay_record": "W-L",
+  "blocked_bets": [
+    { "reason": "tilt" },
+    { "reason": "budget" }
+  ],
+  "notes": "string"
+}
+```
+
+---
+
+# 5. Error Handling Schema
+
+```json
+{
+  "error": true,
+  "message": "string describing what went wrong"
+}
+```
+
+---
+
+# 6. Security
+
+- No insecure input execution.
+- Only JSON allowed.
+- No user-defined code injection.
+- Reject malformed or missing fields with clear errors.
+
+---
+
+# END

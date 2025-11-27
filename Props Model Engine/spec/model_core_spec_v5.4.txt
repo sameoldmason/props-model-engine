@@ -1,0 +1,149 @@
+model_core_spec_v5.4.md
+
+1. Overview
+
+This model produces NBA player prop projections and selects LOCK or HIGH
+confidence plays.
+
+Focus: - same-day games - timestamped, real data only - no guesses or
+invented stats - no memory from past sessions
+
+Allowed markets: - Points - A / R / PA / PR / AR / PRA (only if volume +
+tracking support)
+
+The model runs Module P0 first, then Modules 1 → 12 in order.
+
+------------------------------------------------------------------------
+
+2. Global Rules
+
+1.  Use fresh, timestamped data only.
+2.  If a stat or source doesn’t show a date → ignore it.
+3.  If key data is missing → downgrade confidence or pass.
+4.  Never output parlays unless asked.
+5.  Output only: LOCK or HIGH.
+6.  Never inflate plays.
+
+------------------------------------------------------------------------
+
+3. Module P0 — Projection Engine
+
+Inputs
+
+-   minutes, usage, FGA, FTA, FG%, TS%, 3PA, FT rate
+-   pace
+-   foul environment
+-   role volatility
+-   matchup method profile
+
+Steps
+
+1.  Project minutes
+2.  Project shot volume
+3.  Baseline efficiency
+4.  Pace adjustment
+5.  Points projection (low/mid/high + hit probability)
+
+Example Output
+
+{ “proj_low”: 22.8, “proj_mid”: 25.3, “proj_high”: 28.9, “hit_prob”:
+0.68 }
+
+------------------------------------------------------------------------
+
+4. Module Breakdown (1–12)
+
+Module 1 — Pre-Filters
+
+Reject when: - expected minutes < 24 - heavy blowout risk - top-5
+defense vs primary method + no usage bump - inflated line from heater -
+line moved without volume support
+
+Module 2 — Volume Chain
+
+Tags: - StrongVolume - WeakVolume - FT_Sensitive - VolatileRole
+
+Checks: - usage, shot, assist, rebound volume - foul environment - role
+stability - facilitator tilt
+
+Module 3 — Matchup Engine
+
+Checks defensive scheme, rim protection, help tendencies, switching, PnR
+coverage, foul rate, pace, historical results vs scheme.
+
+Module 4 — Archetype Matrix
+
+Archetypes: - ISO - Rim Finisher - Driver - Spot-Up - PnR Handler - Post
+/ Midrange - Hybrid
+
+Module 5 — Regression / Heater
+
+-   FG% spikes
+-   usage spikes
+-   assist bumps from teammate absence
+-   rebound bumps from flukey minutes Penalty applied if inflated.
+
+Module 6 — Role Compression
+
+Check: - returning starters - hot teammates - rotation tightening -
+coach adjustments Includes facilitator tilt.
+
+Module 7 — Blowout Logic
+
+Different logic for blowout-proof vs blowout-sensitive players.
+
+Module 8 — Home/Road Evidence
+
+Real splits only: - efficiency - FT rate - shot profile - usage - pace
+
+Module 9 — Hard Rules
+
+Examples: - no LOCK on foul-risk big vs elite rim pressure - no overs on
+declining minutes - strict on 28.5+ lines - foul-sensitive downgrade in
+high-foul matchups
+
+Module 10 — Final Projection Blending
+
+Blend all module outputs → compare vs line → PASS if unclear edge.
+
+Module 11 — Confidence Scoring
+
+LOCK: - projection beats line clearly - strong volume - good matchup -
+stable role - low blowout risk
+
+HIGH: - projection beats line - small volatility
+
+Module 12 — Output Rules
+
+-   Only LOCK/HIGH
+-   no moderates
+-   no parlays unless asked
+-   short, factual justification
+
+------------------------------------------------------------------------
+
+5. Data Requirements
+
+  Data                    Used In
+  ----------------------- -------------
+  minutes                 P0, 1, 2, 6
+  FGA                     P0, 2
+  usage                   P0, 2
+  pace                    P0, 3, 7
+  defensive scheme        3, 4
+  rim protection          3, 4, 9
+  foul rate               2, 7
+  teammate availability   1, 6
+  rotations               1, 6
+  prop lines              10, 11
+  role volatility         2, 6
+
+------------------------------------------------------------------------
+
+6. Output Format
+
+{ “plays”: [ { “player”: “Name”, “market”: “Points”, “line”: 23.5,
+“side”: “Over”, “confidence”: “LOCK”, “projection”: { “low”: 22.8,
+“mid”: 25.3, “high”: 28.9 }, “hit_prob”: 0.68, “module_notes”: {
+“volume”: “StrongVolume”, “matchup”: “Advantage”, “regression”:
+“NoRedFlags”, “blowout”: “LowRisk”, “role”: “Stable” } } ] }
