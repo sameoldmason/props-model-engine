@@ -132,6 +132,15 @@ At this point, you technically have a working “engine API.”
 
 ---
 
+# 7. Data ingestion notes (BALLDONTLIE stub)
+
+- The `src/data/ballDontLie.ts` client exposes fixture-driven bundles (box scores, pace, opponent defense, props, spread/schedule) so the engine can run offline.
+- Matchups should now carry `pace.projected_possessions`, `player_stats` (minutes, usage, FGA/FTA, season + recent points), and `opponent_efficiency` (defensive rating, opponent PPP).
+- Optional `vegas` and `schedule` blocks power blowout heuristics; missing data is handled gracefully but limits module coverage.
+- Run `npx ts-node src/run_examples.ts` to exercise the ingestion mapping end-to-end.
+
+---
+
 # 5. Phase 4 — Basic Frontend
 
 **Goal:** A simple web UI that calls your backend.

@@ -16,8 +16,9 @@ export function runPreFilters(params: {
   line: number;
   minutes: number | null;
   projectedPace: number;
+  usageRate?: number | null;
 }): PreFilterResult {
-  const { market, line, minutes, projectedPace } = params;
+  const { market, line, minutes, projectedPace, usageRate } = params;
 
   const reasons: string[] = [];
   let pass = true;
@@ -26,6 +27,10 @@ export function runPreFilters(params: {
   if (minutes !== null && minutes < 24) {
     pass = false;
     reasons.push("MinutesProjTooLow");
+  }
+
+  if (usageRate !== undefined && usageRate !== null && usageRate < 0.18) {
+    reasons.push("UsageFragile");
   }
 
   // Example soft tag: very high points line

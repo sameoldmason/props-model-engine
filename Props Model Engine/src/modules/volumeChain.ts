@@ -21,25 +21,39 @@ export function runVolumeChain(params: {
   minutes: number | null;
   market: Market;
   line: number;
+  usageRate?: number | null;
+  shotVolume?: number | null;
+  recentMinutes?: number | null;
+  emphasize?: boolean;
 }): VolumeResult {
-  const { minutes, market, line } = params;
+  const { minutes, market, line, usageRate, shotVolume, recentMinutes, emphasize } = params;
+
+  const stableMinutes = recentMinutes ?? minutes;
 
   // Unknown minutes → we can't be sure.
-  if (minutes === null) {
+  if (stableMinutes === null) {
     return {
       tag: "UnknownVolume",
-      notes: "Minutes unknown → tagging volume as UnknownVolume."
+      notes: "Volume unknown → minutes missing."
     };
   }
 
-  let tag: VolumeTag;
+  let tag: VolumeTag = "WeakVolume";
+  const usage = usageRate ?? 0;
+  const shots = shotVolume ?? 0;
 
-  if (minutes >= 36) tag = "StrongVolume";
-  else if (minutes >= 30) tag = "MediumVolume";
-  else tag = "WeakVolume";
+  if (stableMinutes >= 35 && (usage >= 0.27 || shots >= 19)) {
+    tag = "StrongVolume";
+  } else if (stableMinutes >= 31 && (usage >= 0.24 || shots >= 15)) {
+    tag = "MediumVolume";
+  } else if (stableMinutes >= 28) {
+    tag = "WeakVolume";
+  }
 
-  // You can later condition this by market/role/usage/etc.
-  const notes = `VolumeTag=${tag} based on minutes=${minutes} and market=${market}, line=${line}.`;
+  const emphasis = emphasize ? "LOCK/HIGH emphasis" : "baseline";
+  const notes = `VolumeTag=${tag} (${emphasis}) → minutes=${stableMinutes}, usage=${usageRate?.toFixed(
+    2
+  ) ?? "n/a"}, shots=${shotVolume ?? "n/a"}, market=${market}, line=${line}.`;
 
   return {
     tag,
